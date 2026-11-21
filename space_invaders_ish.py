@@ -9,14 +9,31 @@ import random
 
 def main(stdscr):
     curses.curs_set(0)
-    stdscr.nodelay(1)
-    stdscr.timeout(50)
+    stdscr.nodelay(0)          # blocking until start
     sh, sw = stdscr.getmaxyx()
     if sh < 20 or sw < 40:
         stdscr.addstr(0, 0, "Terminal too small (need 40x20+)")
         stdscr.refresh()
         time.sleep(2)
         return
+
+    # Start screen — wait for Enter
+    stdscr.clear()
+    stdscr.addstr(sh//2 - 2, sw//2 - 10, "SPACE INVADERS")
+    stdscr.addstr(sh//2,     sw//2 - 12, "Press ENTER to start")
+    stdscr.addstr(sh//2 + 2, sw//2 - 14, "a/d or arrows  space=shoot")
+    stdscr.addstr(sh//2 + 3, sw//2 - 8,  "q = quit")
+    stdscr.refresh()
+    while True:
+        key = stdscr.getch()
+        if key in (10, 13):    # Enter
+            break
+        if key == ord('q'):
+            return
+
+    # Now switch to non-blocking game loop
+    stdscr.nodelay(1)
+    stdscr.timeout(50)
 
     # Game state
     player_x = sw // 2
