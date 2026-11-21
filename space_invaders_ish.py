@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
 Space Invaders for iSH (terminal)
-Controls: arrows or a/d to move, space to shoot, q to quit
+Controls: a/d or arrows to move, space to shoot, q to quit
 """
 import curses
 import time
-import random
 
 def main(stdscr):
     curses.curs_set(0)
-    stdscr.nodelay(0)          # blocking until start
+    stdscr.nodelay(0)
     sh, sw = stdscr.getmaxyx()
     if sh < 20 or sw < 40:
         stdscr.addstr(0, 0, "Terminal too small (need 40x20+)")
@@ -17,40 +16,39 @@ def main(stdscr):
         time.sleep(2)
         return
 
-    # Start screen — wait for Enter
+    # Start screen
     stdscr.clear()
-    stdscr.addstr(sh//2 - 2, sw//2 - 10, "SPACE INVADERS")
-    stdscr.addstr(sh//2,     sw//2 - 12, "Press ENTER to start")
-    stdscr.addstr(sh//2 + 2, sw//2 - 14, "a/d or arrows  space=shoot")
-    stdscr.addstr(sh//2 + 3, sw//2 - 8,  "q = quit")
+    stdscr.addstr(sh//2 - 2, max(0, sw//2 - 10), "SPACE INVADERS")
+    stdscr.addstr(sh//2,     max(0, sw//2 - 12), "Press ENTER to start")
+    stdscr.addstr(sh//2 + 2, max(0, sw//2 - 14), "a/d or arrows  space=shoot")
+    stdscr.addstr(sh//2 + 3, max(0, sw//2 - 8),  "q = quit")
     stdscr.refresh()
     while True:
         key = stdscr.getch()
-        if key in (10, 13):    # Enter
+        if key in (10, 13):
             break
         if key == ord('q'):
             return
 
-    # Now switch to non-blocking game loop
     stdscr.nodelay(1)
-    stdscr.timeout(50)
+    stdscr.timeout(80)   # slower so movement is visible on iSH
 
     # Game state
     player_x = sw // 2
     player_y = sh - 2
-    bullets = []          # [x, y]
-    invaders = []         # [x, y, alive]
+    bullets = []
+    invaders = []
     inv_dir = 1
-    inv_speed = 8
+    inv_frame = 0
     frame = 0
     score = 0
     lives = 3
     game_over = False
 
-    # Spawn invaders
+    # Spawn invaders (3 rows)
     for row in range(3):
-        for col in range(8):
-            invaders.append([4 + col * 4, 2 + row * 2, True])
+        for col in range(7):
+            invaders.append([5 + col * 5, 3 + row * 2, True])
 
     while True:
         stdscr.clear()
@@ -59,16 +57,16 @@ def main(stdscr):
         if key == ord('q'):
             break
         if game_over:
-            stdscr.addstr(sh//2, sw//2-5, "GAME OVER")
-            stdscr.addstr(sh//2+1, sw//2-6, f"Score: {score}")
-            stdscr.addstr(sh//2+2, sw//2-8, "q to quit")
+            stdscr.addstr(sh//2, max(0, sw//2-5), "GAME OVER")
+            stdscr.addstr(sh//2+1, max(0, sw//2-6), f"Score: {score}")
+            stdscr.addstr(sh//2+2, max(0, sw//2-8), "q to quit")
             stdscr.refresh()
             continue
 
         # Input
-        if key in (curses.KEY_LEFT, ord('a')) and player_x > 1:
+        if key in (curses.KEY_LEFT, ord('a')) and player_x > 2:
             player_x -= 1
-        if key in (curses.KEY_RIGHT, ord('d')) and player_x < sw-2:
+        if key in (curses.KEY_RIGHT, ord('d')) and player_x < sw-3:
             player_x += 1
         if key == ord(' ') and len(bullets) < 3:
             bullets.append([player_x, player_y-1])
@@ -79,13 +77,12 @@ def main(stdscr):
             if b[1] < 1:
                 bullets.remove(b)
 
-        # Move invaders
+        # Move invaders (every 6 frames so it is visible)
         frame += 1
-        if frame % inv_speed == 0:
-            # Check edges
+        if frame % 6 == 0:
             xs = [inv[0] for inv in invaders if inv[2]]
             if xs:
-                if max(xs) >= sw-3 or min(xs) <= 2:
+                if max(xs) >= sw-4 or min(xs) <= 2:
                     inv_dir *= -1
                     for inv in invaders:
                         if inv[2]:
@@ -94,42 +91,43 @@ def main(stdscr):
                     for inv in invaders:
                         if inv[2]:
                             inv[0] += inv_dir
+            inv_frame = 1 - inv_frame
 
         # Collisions
         for b in bullets[:]:
             for inv in invaders:
-                if inv[2] and abs(b[0]-inv[0]) < 2 and abs(b[1]-inv[1]) < 1:
+                if inv[2] and abs(b[0] - inv[0]) < 2 and abs(b[1] - inv[1]) < 1:
                     inv[2] = False
                     if b in bullets:
                         bullets.remove(b)
                     score += 10
                     break
 
-        # Invader reach bottom or hit player
+        # Invader reach player
         for inv in invaders:
-            if inv[2] and inv[1] >= player_y-1:
+            if inv[2] and inv[1] >= player_y - 1:
                 lives -= 1
                 inv[2] = False
                 if lives <= 0:
                     game_over = True
 
         # Draw
-        # HUD
         stdscr.addstr(0, 0, f"Score: {score}  Lives: {lives}  q=quit")
-        # Player
-        stdscr.addstr(player_y, player_x, "A")
+        # Player ship
+        stdscr.addstr(player_y, player_x, "^" if player_x < sw-1 else "")
         # Bullets
         for b in bullets:
-            if 0 < b[1] < sh-1:
+            if 0 < b[1] < sh-1 and 0 < b[0] < sw-1:
                 stdscr.addstr(b[1], b[0], "|")
-        # Invaders
+        # Invaders (simple two-frame ASCII)
         for inv in invaders:
-            if inv[2] and 0 < inv[1] < sh-1:
-                stdscr.addstr(inv[1], inv[0], "W")
+            if inv[2] and 0 < inv[1] < sh-1 and 0 < inv[0] < sw-2:
+                char = "M" if inv_frame == 0 else "W"
+                stdscr.addstr(inv[1], inv[0], char)
 
         # Win
         if all(not inv[2] for inv in invaders):
-            stdscr.addstr(sh//2, sw//2-4, "YOU WIN")
+            stdscr.addstr(sh//2, max(0, sw//2-4), "YOU WIN")
             stdscr.refresh()
             time.sleep(2)
             break
