@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 DEFAULT_FEEDS = {
     "national": "https://www.fbi.gov/news/press-releases/RSS",
-    "albany": "https://www.fbi.gov/contact-us/field-offices/albany/news/press-releases/RSS",
+    "albany": "https://www.fbi.gov/feeds/albany-news/RSS",
     "newyork": "https://www.fbi.gov/contact-us/field-offices/newyork/news/press-releases/RSS",
     "boston": "https://www.fbi.gov/contact-us/field-offices/boston/news/press-releases/RSS",
 }
@@ -159,10 +159,12 @@ def main() -> None:
             clean = slug.strip().lower()
             if not clean:
                 continue
-            feeds[clean] = DEFAULT_FEEDS.get(
-                clean,
-                f"https://www.fbi.gov/contact-us/field-offices/{clean}/news/press-releases/RSS",
-            )
+            # Prefer known working feeds; fall back to common patterns
+            if clean in DEFAULT_FEEDS:
+                feeds[clean] = DEFAULT_FEEDS[clean]
+            else:
+                # Try the /feeds/{slug}-news/RSS pattern first (more reliable for many offices)
+                feeds[clean] = f"https://www.fbi.gov/feeds/{clean}-news/RSS"
 
     conn = init_db(args.db)
     all_new = []
